@@ -26,6 +26,17 @@ const serviceSchema = new mongoose.Schema(
       enum: ['active', 'inactive', 'deleted'],
       default: 'active',
     },
+    adminStatus: {
+      type: String,
+      enum: ['active', 'blocked'],
+      default: 'active',
+    },
+    moderationStatus: {
+      type: String,
+      enum: ['approved', 'rejected', 'pending_review'],
+      default: 'pending_review',
+    },
+    moderationReason: { type: String, default: '' },
   },
   {
     timestamps: true
@@ -47,6 +58,8 @@ serviceSchema.statics.addUserService = async function (
   state,
   city,
   price,
+  moderationStatus = 'pending_review',
+  moderationReason = ''
 ) {
   const service = new this({
     seller: userId,
@@ -55,7 +68,9 @@ serviceSchema.statics.addUserService = async function (
     country,
     state,
     city,
-    price
+    price,
+    moderationStatus,
+    moderationReason
   });
 
   const imagesPromises = images.map((item, index) => saveFile(`services/${service._id}/images/${v4()}`, item));

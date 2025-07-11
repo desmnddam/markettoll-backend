@@ -2,6 +2,7 @@ import express from 'express';
 import { userValidation } from '../validations/index.js';
 import { userController } from '../controllers/index.js';
 import { validateJWTAndValidateUser, validateUserVerified, validateUserAddress, validateUserStripeSetup, checkGuestOrUser } from '../accessControls/index.js';
+import moderateContent from '../accessControls/moderateContent.js';
 
 const router = express.Router();
 
@@ -10,6 +11,10 @@ router.post(
   '/email-password-signup',
   userValidation.emailPasswordSignUp,
   userController.emailPasswordSignUp
+);
+router.post(
+  '/email-password-signup-admin',
+  userController.emailPasswordSignUpAdmin
 );
 router.post(
   '/email-password-login',
@@ -313,6 +318,7 @@ router.post(
   '/product',
   validateJWTAndValidateUser,
   validateUserVerified,
+  moderateContent,
   validateUserStripeSetup,
   userValidation.addProduct,
   userController.addProduct
@@ -393,6 +399,7 @@ router.post(
   '/service',
   validateJWTAndValidateUser,
   validateUserVerified,
+  moderateContent,
   userValidation.addService,
   userController.addService,
 );

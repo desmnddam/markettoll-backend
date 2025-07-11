@@ -34,7 +34,7 @@ export const productSchema = new mongoose.Schema(
       },
       coordinates: {
         type: [Number], // Format: [longitude, latitude]
-        default: undefined,
+        default: [0, 0],
         validate: {
           validator: (val) => val.length === 2,
           message: 'Coordinates must be an array of [longitude, latitude]'
@@ -60,7 +60,13 @@ export const productSchema = new mongoose.Schema(
       type: String,
       enum: ['active', 'blocked'],
       default: 'active',
-    }
+    },
+    moderationStatus: {
+      type: String,
+      enum: ['approved', 'rejected', 'pending_review'],
+      default: 'pending_review',
+    },
+    moderationReason: { type: String, default: '' },
   },
   {
     timestamps: true,
@@ -90,7 +96,9 @@ productSchema.statics.addUserProduct = async function (
   pickupAddress,
   price,
   quantity,
-  location 
+  location,
+  moderationStatus = 'pending_review',
+  moderationReason = ''
 ) {
   if (!fulfillmentMethod.selfPickup && pickupAddress) {
     throwError(409, 'Pickup address is given but self pickup is not selected.');
@@ -120,6 +128,8 @@ productSchema.statics.addUserProduct = async function (
     pickupAddress,
     price,
     quantity,
+    moderationStatus,
+    moderationReason,
     ...(location && { location }) // <-- only add if provided
 
   });
@@ -318,9 +328,6 @@ productSchema.statics.getHomeScreenProducts = async function (userId, userAddres
   // Optional filters
   if (filters.state) matchQuery.state = filters.state;
   if (filters.city) matchQuery.city = filters.city;
-
-  
-  
  
   const geoMatch = filters.geoFilter || {};
 

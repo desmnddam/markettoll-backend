@@ -42,8 +42,8 @@ app.use((req, res, next) => {
   printTime();
   console.log(req.headers.authorization);
   console.log(req.method, req.url);
-  console.log('Body:', req.body);
-  console.log('Files:', req.files);
+  // console.log('Body:', req.body);
+  // console.log('Files:', req.files);
   next();
 });
 

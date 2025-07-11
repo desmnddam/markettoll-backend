@@ -90,6 +90,35 @@ export const getProducts = async (req, res, next) => {
   }
 };
 
+export const getPendingReviewProducts = async (req, res, next) => {
+  try {
+    const { name, category, subCategory, page } = req.query;
+    if (name) {
+      await stringSchema('Name').validate(name);
+    }
+    if (category !== '') {
+      await stringSchema('Category').validate(category);
+    }
+    if (subCategory !== '') {
+      await stringSchema('Sub Category').validate(subCategory);
+    }
+    await pageSchema('Page').validate(page);
+    next();
+  } catch (err) {
+    next({ ...err, status: 400 });
+  }
+};
+
+export const getPendingReviewServices = async (req, res, next) => {
+  try {
+    const { page } = req.query;
+    await pageSchema('Page').validate(page);
+    next();
+  } catch (err) {
+    next({ ...err, status: 400 });
+  }
+};
+
 export const getDeactivatedProducts = async (req, res, next) => {
   try {
     const { name, page } = req.query;

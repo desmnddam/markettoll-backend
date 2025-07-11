@@ -62,7 +62,7 @@ const userSchema = new mongoose.Schema(
       },
       verified: {
         type: Boolean,
-        default: false,
+        default: true,
       },
     },
     phoneNumber: {
@@ -337,6 +337,26 @@ userSchema.statics.emailPasswordSignUp = async function (
   return newUser._doc;
 };
 
+userSchema.statics.emailPasswordSignUpAdmin = async function (
+  name,
+  email,
+  password,
+  role,
+) {
+  const salt = await bcrypt.genSalt();
+  const hashedPassword = await bcrypt.hash(password, salt);
+  
+  const newUser = new this({
+    name,
+    email: { value: email },
+    password: hashedPassword,
+    role
+  });
+  await newUser.save();
+
+  return newUser._doc;
+};
+
 userSchema.statics.emailPasswordLogIn = async function (email, password) {
   const existingUser = await this.findOne({ 'email.value': email });
   console.log("existingUser====", existingUser);
@@ -401,7 +421,6 @@ userSchema.statics.emailPasswordLogInAdmin = async function (email, password) {
   if (!existingUser.email.verified || !existingUser.phoneNumber.verified) {
     throwError(401, 'Invalid Credentials.');
   }
-
   return existingUser._doc;
 };
 
@@ -641,7 +660,6 @@ userSchema.statics.verifyEmailSendEmailOTP = async function (_id) {
 
 userSchema.statics.verifyEmailVerifyEmailOTP = async function (_id, otp) {
   let user = await this.findById(_id);
-
   if (!user) {
     throwError(404, 'User not found.');
   }
@@ -662,7 +680,7 @@ userSchema.statics.verifyEmailVerifyEmailOTP = async function (_id, otp) {
       new: true,
     }
   );
-
+  
   return user._doc;
 };
 

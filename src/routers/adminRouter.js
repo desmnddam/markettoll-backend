@@ -68,6 +68,30 @@ router.get(
 );
 
 router.get(
+  '/pending-review-products',
+  validateJWTAndValidateUser,
+  validateUserVerified,
+  validateUserAdmin,
+  adminValidation.getPendingReviewProducts,
+  adminController.getPendingReviewProducts,
+);
+router.post(
+  '/manual-moderate-products',
+  validateJWTAndValidateUser,
+  validateUserVerified,
+  validateUserAdmin,
+  adminController.moderateProducts,
+);
+router.get(
+  '/pending-review-services',
+  validateJWTAndValidateUser,
+  validateUserVerified,
+  validateUserAdmin,
+  adminValidation.getPendingReviewServices,
+  adminController.getPendingReviewServices,
+);
+
+router.get(
   '/deactivated-products',
   validateJWTAndValidateUser,
   validateUserVerified,

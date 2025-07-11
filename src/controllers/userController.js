@@ -24,6 +24,27 @@ export const emailPasswordSignUp = async (req, res, next) => {
   }
 };
 
+export const emailPasswordSignUpAdmin = async (req, res, next) => {
+  try {
+    const { name, email, password, role } = req.body;
+    
+    const data = await userModel.emailPasswordSignUpAdmin(
+      name,
+      email,
+      password,
+      role
+    );
+    const token = createJWT(data._id);
+    res.status(201).json({
+      success: true,
+      message: 'Account created successfully.',
+      data: { ...data, token }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const emailPasswordLogIn = async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -832,7 +853,11 @@ export const addProduct = async (req, res, next) => {
     } = req.body;
     const images = req.files.filter(t => t.fieldname === 'images');
     const parsedLocation = location ? (typeof location === 'string' ? JSON.parse(location) : location) : undefined;
-
+    
+    // Get moderation status from middleware
+    const moderationStatus = req.moderationStatus || 'pending_review';
+    const moderationReason = req.moderationReason || '';
+    
     const data = await userModel.addProduct(
       req.user._id,
       images,
@@ -848,13 +873,25 @@ export const addProduct = async (req, res, next) => {
       pickupAddress,
       price,
       quantity,
-      parsedLocation 
+      parsedLocation,
+      moderationStatus,
+      moderationReason
     );
+
+    // Different response based on moderation status
+    if (moderationStatus === 'pending_review') {
+      res.status(202).json({
+        success: true,
+        message: 'Product submitted successfully and is pending review.',
+        data: data
+      });
+    } else {
     res.status(201).json({
       success: true,
       message: 'Product added successfully.',
       data: data
     });
+  }
   } catch (err) {
     next(err);
   }
@@ -1006,6 +1043,10 @@ export const addService = async (req, res, next) => {
     } = req.body;
     const images = req.files.filter(t => t.fieldname === 'images');
 
+    // Get moderation status from middleware
+    const moderationStatus = req.moderationStatus || 'pending_review';
+    const moderationReason = req.moderationReason || '';
+
     const data = await userModel.addService(
       req.user._id,
       images,
@@ -1015,13 +1056,25 @@ export const addService = async (req, res, next) => {
       country,
       state,
       city,
-      price
+      price,
+      moderationStatus,
+      moderationReason
     );
-    res.status(201).json({
-      success: true,
-      message: 'Service created successfully.',
-      data: data
-    });
+    
+    // Different response based on moderation status
+    if (moderationStatus === 'pending_review') {
+      res.status(202).json({
+        success: true,
+        message: 'Service submitted successfully and is pending review.',
+        data: data
+      });
+    } else {
+      res.status(201).json({
+        success: true,
+        message: 'Service created successfully.',
+        data: data
+      });
+    }
   } catch (err) {
     next(err);
   }
@@ -1201,6 +1254,7 @@ export const getProductCategories = async (req, res, next) => {
 export const getHomeScreenProducts = async (req, res, next) => {
   try {
     const { city, state, lat, lng, radius } = req.query;
+    console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>", req.query);
     let data;
     const geoFilter = lat && lng && radius
       ? {
@@ -1214,6 +1268,7 @@ export const getHomeScreenProducts = async (req, res, next) => {
           }
         }
       : {};
+      console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>geoFilter", geoFilter)
     if (req.user) {
       data = await userModel.getHomeScreenProducts(req.user._id, { city, state, geoFilter  });
     }

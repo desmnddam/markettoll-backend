@@ -171,6 +171,146 @@ export const getProducts = async (req, res, next) => {
   }
 };
 
+export const getPendingReviewProducts = async (req, res, next) => {
+  try {
+    const { name, category, subCategory, page } = req.query;
+    const limit = 100;
+    const skip = (page - 1) * limit;
+    let query = { status: 'active', adminStatus: 'active', moderationStatus: 'pending_review' };
+    if (name) {
+      const nameRegex = new RegExp(name.trim().split('').join('.*'), 'i');
+      query = { ...query, name: { $regex: nameRegex } };
+    }
+    if (category) {
+      query = { ...query, category };
+    }
+    if (subCategory) {
+      query = { ...query, subCategory };
+    }
+    const data = await productModel.aggregate([
+      {
+        $match: query
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'seller',
+          foreignField: '_id',
+          as: 'seller'
+        }
+      },
+      {
+        $unwind: '$seller'
+      },
+      {
+        $match: {
+          'seller.status': 'active',
+          'seller.adminStatus': 'active'
+        }
+      },
+      {
+        $sort: { name: 1 }
+      },
+      {
+        $skip: skip
+      },
+      {
+        $limit: limit
+      }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: 'Products retrieved successfully.',
+      data: data
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const moderateProducts = async (req, res, next) => {
+  try {
+    const { ids, status } = req.body;
+    if (!Array.isArray(ids) || !ids.length) {
+      return res.status(400).json({ success: false, message: 'No product ids provided.' });
+    }
+    if (!['accepted', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status.' });
+    }
+    const moderationStatus = status === 'accepted' ? 'approved' : 'rejected';
+    const moderationReason = status === 'accepted' ? '' : 'Rejected by admin';
+    const result = await productModel.updateMany(
+      { _id: { $in: ids }, moderationStatus: 'pending_review' },
+      { $set: { moderationStatus, moderationReason } }
+    );
+    res.status(200).json({
+      success: true,
+      message: `Products ${status === 'accepted' ? 'approved' : 'rejected'} successfully.`,
+      matchedCount: result.matchedCount,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getPendingReviewServices = async (req, res, next) => {
+  try {
+    const { page } = req.query;
+    const limit = 50;
+    const skip = (page - 1) * limit;
+    
+    const services = await serviceModel.aggregate([
+      {
+        $match: { 
+          moderationStatus: 'pending_review',
+          status: { $ne: 'deleted' }
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'seller',
+          foreignField: '_id',
+          as: 'seller'
+        }
+      },
+      {
+        $unwind: '$seller'
+      },
+      {
+        $sort: { createdAt: -1 }
+      },
+      {
+        $skip: skip
+      },
+      {
+        $limit: limit
+      }
+    ]);
+    
+    const total = await serviceModel.countDocuments({ 
+      moderationStatus: 'pending_review',
+      status: { $ne: 'deleted' }
+    });
+    
+    res.status(200).json({
+      success: true,
+      message: 'Pending review services retrieved successfully.',
+      data: {
+        items: services,
+        total,
+        page: parseInt(page) || 1,
+        limit,
+        hasMore: skip + limit < total
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const getDeactivatedProducts = async (req, res, next) => {
   try {
     const { name, page } = req.query;
@@ -325,7 +465,6 @@ export const addSubcategory = async (req, res, next) => {
   try {
     const images = req.files?.filter(t => t.fieldname === 'images');
     const { categoryName, subcategoryNames } = req.body;
-
     const formattedCategoryName = categoryName.replace(/\s+/g, '');
 
     const imagesPromises = [];
