@@ -11,7 +11,7 @@ export const updateInfluencerStatus = async () => {
     // Check if influencer setting is set to "auto"
     const settings = await InfluencerSettings.findOne();
     if (!settings || settings.influencerStatus !== 'auto') {
-        console.log("InfluencerSetting==", settings.influencerStatus);
+        console.log("InfluencerSetting==", settings?.influencerStatus);
         
       return;
     }

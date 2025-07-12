@@ -64,7 +64,7 @@ export const productSchema = new mongoose.Schema(
     moderationStatus: {
       type: String,
       enum: ['approved', 'rejected', 'pending_review'],
-      default: 'pending_review',
+      default: 'approved',
     },
     moderationReason: { type: String, default: '' },
   },
@@ -312,14 +312,14 @@ productSchema.statics.getUserSearchedProductsBoosted = async function (userId, u
 };
 
 //buyer routes
-productSchema.statics.getHomeScreenProducts = async function (userId, userAddress,  filters = {}) {
+productSchema.statics.getHomeScreenProducts = async function (userId, userAddress, filters = {}) {
   const numCategories = 5;
   const numProductsPerCategory = 10;
   console.log("userAddress==", userAddress);
-  
+
 
   const matchQuery = {
-    seller: { $ne: userId },
+    seller: userId,
     country: userAddress.country,
     status: 'active',
     adminStatus: 'active',
@@ -328,7 +328,7 @@ productSchema.statics.getHomeScreenProducts = async function (userId, userAddres
   // Optional filters
   if (filters.state) matchQuery.state = filters.state;
   if (filters.city) matchQuery.city = filters.city;
- 
+
   const geoMatch = filters.geoFilter || {};
 
   const categoryProducts = await this.aggregate([
@@ -524,7 +524,7 @@ productSchema.statics.getHomeScreenSearchedProducts = async function (userId, us
 
   const products = await this.aggregate([
     {
-     $match: { ...query, ...geoFilter }
+      $match: { ...query, ...geoFilter }
     },
     {
       $lookup: {

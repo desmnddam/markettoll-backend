@@ -161,7 +161,7 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 5,
     },
-    influencerRef : {
+    influencerRef: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'user',
       default: null
@@ -271,14 +271,14 @@ userSchema.statics.emailPasswordSignUp = async function (
   role,
   influencerRef
 ) {
-  
+
   const existingEmail = await this.findOne({ 'email.value': email });
 
   if (existingEmail) {
     if (!existingEmail.appleAuthId && !existingEmail.googleAuthId && !existingEmail.facebookAuthId) {
       if (!existingEmail.email.verified || !existingEmail.phoneNumber.verified) {
         await this.deleteOne({ 'email.value': email });
-        return this.emailPasswordSignUp(name, email, phoneNumber, password,role, influencerRef);
+        return this.emailPasswordSignUp(name, email, phoneNumber, password, role, influencerRef);
       }
     }
 
@@ -315,14 +315,14 @@ userSchema.statics.emailPasswordSignUp = async function (
     const settings = await InfluencerSettings.findOne() || await InfluencerSettings.create({});
     influencerStatus = settings.influencerStatus === 'auto' ? 'active' : 'inactive';
   }
-  
+
   let influencerRefUserId = null;
-    if (influencerRef) {
-      const refUser = await this.findById(influencerRef);
-      if (refUser) {
-        influencerRefUserId = refUser._id;
-      }
+  if (influencerRef) {
+    const refUser = await this.findById(influencerRef);
+    if (refUser) {
+      influencerRefUserId = refUser._id;
     }
+  }
   const newUser = new this({
     name,
     email: { value: email },
@@ -345,7 +345,7 @@ userSchema.statics.emailPasswordSignUpAdmin = async function (
 ) {
   const salt = await bcrypt.genSalt();
   const hashedPassword = await bcrypt.hash(password, salt);
-  
+
   const newUser = new this({
     name,
     email: { value: email },
@@ -360,9 +360,9 @@ userSchema.statics.emailPasswordSignUpAdmin = async function (
 userSchema.statics.emailPasswordLogIn = async function (email, password) {
   const existingUser = await this.findOne({ 'email.value': email });
   console.log("existingUser====", existingUser);
-  
+
   if (!existingUser) {
-    
+
     throwError(401, 'Invalid Credentials.');
   }
 
@@ -680,7 +680,7 @@ userSchema.statics.verifyEmailVerifyEmailOTP = async function (_id, otp) {
       new: true,
     }
   );
-  
+
   return user._doc;
 };
 
@@ -1716,7 +1716,9 @@ userSchema.statics.addProduct = async function (
   pickupAddress,
   price,
   quantity,
-  location 
+  location,
+  moderationStatus,
+  moderationReason
 ) {
   const user = await this.findById(_id);
 
@@ -1744,7 +1746,9 @@ userSchema.statics.addProduct = async function (
     pickupAddress,
     price,
     quantity,
-    location 
+    location,
+    moderationStatus,
+    moderationReason
   );
 
   return product;
@@ -1996,7 +2000,9 @@ userSchema.statics.addService = async function (
   country,
   state,
   city,
-  price
+  price,
+  moderationStatus,
+  moderationReason
 ) {
 
   const user = await this.findById(_id);
@@ -2014,7 +2020,9 @@ userSchema.statics.addService = async function (
     country,
     state,
     city,
-    price
+    price,
+    moderationStatus,
+    moderationReason
   );
 
   return service;
@@ -2225,7 +2233,6 @@ userSchema.statics.getProductCategories = async function () {
 //buyer routes
 userSchema.statics.getHomeScreenProducts = async function (_id, filters) {
   const user = await this.findById(_id);
-
   if (!user) {
     throwError(404, 'User not found.');
   }
@@ -2248,7 +2255,8 @@ userSchema.statics.getHomeScreenSearchedProducts = async function (_id, name, ca
     throwError(404, 'User not found.');
   }
 
-  const products = await productModel.getHomeScreenSearchedProducts(_id, user.address, name, category, subCategory, page, city, state, lat, lng, radius);
+  // const products = await productModel.getHomeScreenSearchedProducts(_id, user.address, name, category, subCategory, page, city, state, lat, lng, radius);
+  const products = await productModel.getHomeScreenSearchedProductsGuestMode(name, category, subCategory, page);
 
   return products;
 };
@@ -2330,7 +2338,7 @@ userSchema.statics.addCartProduct = async function (_id, productId, fulfillmentM
   if (existingProduct.country !== user.address.country) {
     throwError(409, 'User country does not match with product country.');
   }
-  
+
   // if (existingProduct.state !== user.address.state) {
   //   throwError(409, 'User state does not match with product state.');
   // }
@@ -3132,22 +3140,22 @@ userSchema.statics.subscribePaidPlanStripe = async function (_id, subscriptionNa
   const paySubscription = await paySubscriptionCard(subscription.paymentIntentId, user.stripeCustomer.paymentMethod.id);
   // ✅ Referral
   console.log("user=====referels==", user.influencerRef);
-  
+
   // -----------------------
   if (user.influencerRef) {
     console.log("in");
-    
+
     const existingReward = await ReferralReward.findOne({
       referredUser: _id
     });
     console.log("test in");
-    
+
     if (!existingReward) {
-    console.log("not found");
+      console.log("not found");
 
       const influencer = await this.findById(user.influencerRef);
       console.log("influencer====", influencer);
-      
+
 
       if (influencer && influencer.influencerRate) {
         const amountPaid = (paySubscription.amount_received || 0) / 100; // Stripe usually returns in cents
@@ -3164,7 +3172,7 @@ userSchema.statics.subscribePaidPlanStripe = async function (_id, subscriptionNa
           referralAmount
         });
 
-        await reward.save(); 
+        await reward.save();
         const existingWallet = await InfluencerWallet.findOne({ influencer: influencer._id });
         if (existingWallet) {
           existingWallet.amount += referralAmount;

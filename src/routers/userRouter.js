@@ -319,7 +319,7 @@ router.post(
   validateJWTAndValidateUser,
   validateUserVerified,
   moderateContent,
-  validateUserStripeSetup,
+  // validateUserStripeSetup,
   userValidation.addProduct,
   userController.addProduct
 );

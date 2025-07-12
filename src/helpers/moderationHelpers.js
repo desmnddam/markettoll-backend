@@ -1,100 +1,53 @@
 import axios from 'axios';
 import fs from 'fs/promises';
-import { GoogleAuth } from 'google-auth-library';
-import { GCPServiceAccountObject } from '../files/index.js';
+import { RekognitionClient, DetectModerationLabelsCommand } from '@aws-sdk/client-rekognition';
 
-// Initialize Google Auth with service account
-const auth = new GoogleAuth({
-  credentials: GCPServiceAccountObject,
-  scopes: ['https://www.googleapis.com/auth/cloud-vision']
+// Initialize AWS Rekognition client
+const rekognitionClient = new RekognitionClient({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
 });
 
-// Google Vision API helpers using service account
-export async function analyzeImageWithGoogleVision(imageBuffer) {
-  console.log("DSJSLFJDSLKFJSDJFKLSDJFSF", imageBuffer);
-  
+// AWS Rekognition API helper for image moderation
+export async function analyzeImageWithAWSRekognition(imageBuffer) {
+  console.log("imageBuffer", Buffer.from(imageBuffer));
   try {
-    const base64Image = imageBuffer.toString('base64');
-    const url = 'https://vision.googleapis.com/v1/images:annotate';
-    const requestBody = {
-      requests: [
-        {
-          image: { content: base64Image },
-          features: [{ type: 'SAFE_SEARCH_DETECTION' }],
-        },
-      ],
-    };
-
-    // Get access token using service account
-    const client = await auth.getClient();
-    const accessToken = await client.getAccessToken();
-    
-    try {
-      const response = await axios.post(url, requestBody, {
-      headers: {
-        'Authorization': `Bearer ${accessToken.token}`,
-        'Content-Type': 'application/json'
-      }
-      });
-      const safeSearch = response.data.responses[0].safeSearchAnnotation;
-      // You can adjust thresholds as needed
-      const isInappropriate =
-        safeSearch.adult === 'LIKELY' || safeSearch.adult === 'VERY_LIKELY' ||
-        safeSearch.violence === 'LIKELY' || safeSearch.violence === 'VERY_LIKELY' ||
-        safeSearch.racy === 'LIKELY' || safeSearch.racy === 'VERY_LIKELY';
-      
-      return { isInappropriate, safeSearch };
-    } catch (error) {
-        if (error.response?.status === 403) {
-          const message = error.response.data.error?.message;
-          if (message?.includes('Billing')) {
-            console.error('❌ Google Vision billing not enabled.');
-          } else {
-            console.error('❌ Google Vision permission error:', message);
-          }
-        } else {
-          console.error('❌ Vision API call failed:', error.message);
-      }
-    }
-    
-  } catch (error) {
-    console.error('Google Vision SafeSearch error:', error);
-    throw error;
-  }
-}
-
-export async function extractTextWithGoogleVision(imageBuffer) {
-  try {
-    const base64Image = imageBuffer.toString('base64');
-    const url = 'https://vision.googleapis.com/v1/images:annotate';
-    const requestBody = {
-      requests: [
-        {
-          image: { content: base64Image },
-          features: [{ type: 'TEXT_DETECTION' }],
-        },
-      ],
-    };
-
-    // Get access token using service account
-    const client = await auth.getClient();
-    const accessToken = await client.getAccessToken();
-    
-    const response = await axios.post(url, requestBody, {
-      headers: {
-        'Authorization': `Bearer ${accessToken.token}`,
-        'Content-Type': 'application/json'
-      }
+    const command = new DetectModerationLabelsCommand({
+      Image: {
+        Bytes: imageBuffer,
+      },
+      MinConfidence: 50, // Minimum confidence threshold
     });
+    const response = await rekognitionClient.send(command);
+    const moderationLabels = response.ModerationLabels || [];
+    console.log("response", response.ModerationLabels);
 
-    const textAnnotations = response.data.responses[0].textAnnotations;
-    if (textAnnotations && textAnnotations.length > 0) {
-      return textAnnotations[0].description;
+    // Check for strong inappropriate content
+    let status = 'approved';
+    let reason = '';
+    for (const label of moderationLabels) {
+      const confidence = label.Confidence || 0;
+      const name = label.Name || '';
+
+      // Strong inappropriate: confidence > 80%
+      if (confidence > 80) {
+        status = 'rejected';
+        reason = reason + `${name}${' '}`;
+        break;
+      }
+      // Pending review: confidence > 50%
+      else if (confidence > 50 && status !== 'rejected') {
+        status = 'pending_review';
+        reason = reason + `${name}${' '}`;
+      }
     }
-    return '';
+
+    return { status, reason };
   } catch (error) {
-    console.error('Google Vision OCR error:', error);
-    throw error;
+    return nextError(next, 500, 'Please upload a product/service image that meets our content guidelines.');
   }
 }
 
@@ -107,7 +60,33 @@ export async function moderateTextWithOpenAI(text, openaiApiKey) {
     { headers: { Authorization: `Bearer ${openaiApiKey}` } }
   );
   const result = response.data.results[0];
-  const isInappropriate = result.flagged;
-  // You can check result.categories for more details
-  return { isInappropriate, categories: result.categories, flagged: result.flagged };
+  // OpenAI returns categories (bool) and category_scores (float 0-1)
+  let status = 'approved';
+  let flagged = false;
+  for (const [cat, flaggedBool] of Object.entries(result.categories)) {
+    if (flaggedBool) {
+      const score = result.category_scores[cat];
+      if (score > 0.7) {
+        status = 'rejected';
+        flagged = true;
+        break;
+      } else if (score > 0.3 && status !== 'rejected') {
+        status = 'pending_review';
+        flagged = true;
+      }
+    }
+  }
+  return { status, categories: result.categories, flagged };
 }
+
+// async function removeBgWithRemBG(buffer) {
+//   const formData = new FormData();
+//   formData.append('image_file', new Blob([buffer]), 'image.png');
+
+//   const res = await fetch('http://localhost:5000', {
+//     method: 'POST',
+//     body: formData,
+//   });
+
+//   return await res.arrayBuffer(); // returns cleaned image buffer
+// }

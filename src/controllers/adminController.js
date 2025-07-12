@@ -255,18 +255,46 @@ export const moderateProducts = async (req, res, next) => {
   }
 };
 
+export const moderateServices = async (req, res, next) => {
+  try {
+    const { ids, status } = req.body;
+    if (!Array.isArray(ids) || !ids.length) {
+      return res.status(400).json({ success: false, message: 'No Service ids provided.' });
+    }
+    if (!['accepted', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status.' });
+    }
+    const moderationStatus = status === 'accepted' ? 'approved' : 'rejected';
+    const moderationReason = status === 'accepted' ? '' : 'Rejected by admin';
+    const result = await serviceModel.updateMany(
+      { _id: { $in: ids }, moderationStatus: 'pending_review' },
+      { $set: { moderationStatus, moderationReason } }
+    );
+    res.status(200).json({
+      success: true,
+      message: `Products ${status === 'accepted' ? 'approved' : 'rejected'} successfully.`,
+      matchedCount: result.matchedCount,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const getPendingReviewServices = async (req, res, next) => {
   try {
-    const { page } = req.query;
+    const {name, page } = req.query;
     const limit = 50;
     const skip = (page - 1) * limit;
-    
+    let query = { status: 'active', adminStatus: 'active', moderationStatus: 'pending_review' };
+
+    if (name) {
+      const nameRegex = new RegExp(name.trim().split('').join('.*'), 'i');
+      query = { ...query, name: { $regex: nameRegex } };
+    }
     const services = await serviceModel.aggregate([
       {
-        $match: { 
-          moderationStatus: 'pending_review',
-          status: { $ne: 'deleted' }
-        }
+        $match: query,
       },
       {
         $lookup: {

@@ -1,4 +1,4 @@
-import { analyzeImageWithGoogleVision, extractTextWithGoogleVision, moderateTextWithOpenAI } from '../helpers/moderationHelpers.js';
+import { analyzeImageWithAWSRekognition, moderateTextWithOpenAI } from '../helpers/moderationHelpers.js';
 import { nextError } from '../utils/index.js';
 import fs from 'fs/promises';
 
@@ -16,63 +16,46 @@ export default async function moderateContent(req, res, next) {
     const description = req.body.description || '';
     const name = req.body.name || '';
     const pickupAddress = req.body.pickupAddress || '';
-    
     // Get images from req.files.images (multer field name)
     const images = req.files?.filter(t => t.fieldname === 'images');
-    let allExtractedText = `${description} ${name} ${pickupAddress}`.trim();
-    
+    let allExtractedText = `${description} ${name}`.trim();
+
     let moderationStatus = 'approved';
     let moderationReason = '';
-    // 1. Analyze each image
+
     for (const img of images) {
-      console.log("images", img);
-      
-      // img.buffer if using multer, otherwise read file
-      // const buffer = img.buffer || (img.path ? await fs.readFile(img.path) : null);
-      // if (!buffer) continue;
 
+      const buffer = img.buffer || (img.path ? await fs.readFile(img.path) : null);
+      if (!buffer) continue;
+
+      // cleanBuffer = await removeBgWithRemBG(imageBuffer);
       // // SafeSearch
-      // const safeSearchResult = await analyzeImageWithGoogleVision(buffer);
-      // console.log("SafeSearchResult", safeSearchResult);
-
-      // if (safeSearchResult?.isInappropriate) {
-      //   moderationStatus = 'rejected';
-      //   moderationReason = 'Inappropriate image content';
-      //   break;
-      // }
-
-      // // OCR
-      // const ocrText = await extractTextWithGoogleVision(buffer);
-      // console.log("ocrText", ocrText);
-      // if (ocrText) allExtractedText += ' ' + ocrText;
+      const { status: imageStatus, reason } = await analyzeImageWithAWSRekognition(buffer);
+      moderationStatus = imageStatus;
+      moderationReason = reason;
     }
 
-    // 2. If not already rejected, check text moderation
-    // if (moderationStatus === 'approved' && allExtractedText.trim()) {
-    //   const textModeration = await moderateTextWithOpenAI(allExtractedText, OPENAI_API_KEY);
-    //   console.log("textModeration", textModeration);
-    //   if (textModeration.isInappropriate) {
-    //     moderationStatus = 'rejected';
-    //     moderationReason = 'Inappropriate text content';
-    //   } else if (textModeration.flagged) {
-    //     moderationStatus = 'pending_review';
-    //     moderationReason = 'Text flagged for manual review';
-    //   }
-    // }
+    if (moderationStatus !== 'rejected' && allExtractedText.trim()) {
+      const { status: textStatus } = await moderateTextWithOpenAI(allExtractedText, OPENAI_API_KEY);
+      if (textStatus === 'rejected') {
+        moderationStatus = 'rejected';
+        moderationReason = 'Please update a product description that meets our content guidelines.';
+      } else if (textStatus === 'pending_review' && moderationStatus !== 'rejected') {
+        moderationStatus = 'pending_review';
+        moderationReason = moderationReason + 'Image flaged: Inappropriate text';
+      }
+    }
 
-    // 3. Set moderation info for controller to use
     req.moderationStatus = moderationStatus;
     req.moderationReason = moderationReason;
-    
-    // 4. Only reject immediately if content is clearly inappropriate
+    console.log("#####################", moderationStatus, moderationReason);
     if (moderationStatus === 'rejected') {
-      return nextError(next, 400, moderationReason);
+      return nextError(next, 400, 'Please update product/service that meets our content guidelines.');
     }
-    
-    // 5. For approved or pending_review, continue to controller
+
     next();
   } catch (err) {
     console.error('Moderation error:', err);
-    return nextError(next, 500, 'Error during content moderation');
+    return nextError(next, 500, 'Please update product/service that meets our content guidelines.');
   }
 } 

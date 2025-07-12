@@ -4,7 +4,7 @@ import { createJWT, sendNotification } from '../utils/index.js';
 export const emailPasswordSignUp = async (req, res, next) => {
   try {
     const { name, email, phoneNumber, password, role, influencerRef } = req.body;
-    
+
     const data = await userModel.emailPasswordSignUp(
       name,
       email,
@@ -27,7 +27,7 @@ export const emailPasswordSignUp = async (req, res, next) => {
 export const emailPasswordSignUpAdmin = async (req, res, next) => {
   try {
     const { name, email, password, role } = req.body;
-    
+
     const data = await userModel.emailPasswordSignUpAdmin(
       name,
       email,
@@ -853,11 +853,11 @@ export const addProduct = async (req, res, next) => {
     } = req.body;
     const images = req.files.filter(t => t.fieldname === 'images');
     const parsedLocation = location ? (typeof location === 'string' ? JSON.parse(location) : location) : undefined;
-    
+    console.log("???????????????????", req.moderationStatus, req.moderationReason);
     // Get moderation status from middleware
-    const moderationStatus = req.moderationStatus || 'pending_review';
-    const moderationReason = req.moderationReason || '';
-    
+    const moderationStatus = req.moderationStatus;
+    const moderationReason = req.moderationReason;
+
     const data = await userModel.addProduct(
       req.user._id,
       images,
@@ -886,12 +886,12 @@ export const addProduct = async (req, res, next) => {
         data: data
       });
     } else {
-    res.status(201).json({
-      success: true,
-      message: 'Product added successfully.',
-      data: data
-    });
-  }
+      res.status(201).json({
+        success: true,
+        message: 'Product added successfully.',
+        data: data
+      });
+    }
   } catch (err) {
     next(err);
   }
@@ -1041,11 +1041,12 @@ export const addService = async (req, res, next) => {
       city,
       price,
     } = req.body;
+    console.log("new service ", req.body);
     const images = req.files.filter(t => t.fieldname === 'images');
 
     // Get moderation status from middleware
-    const moderationStatus = req.moderationStatus || 'pending_review';
-    const moderationReason = req.moderationReason || '';
+    const moderationStatus = req.moderationStatus;
+    const moderationReason = req.moderationReason;
 
     const data = await userModel.addService(
       req.user._id,
@@ -1060,7 +1061,7 @@ export const addService = async (req, res, next) => {
       moderationStatus,
       moderationReason
     );
-    
+
     // Different response based on moderation status
     if (moderationStatus === 'pending_review') {
       res.status(202).json({
@@ -1254,23 +1255,21 @@ export const getProductCategories = async (req, res, next) => {
 export const getHomeScreenProducts = async (req, res, next) => {
   try {
     const { city, state, lat, lng, radius } = req.query;
-    console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>", req.query);
     let data;
     const geoFilter = lat && lng && radius
       ? {
-          location: {
-            $geoWithin: {
-              $centerSphere: [
-                [parseFloat(lng), parseFloat(lat)],
-                parseFloat(radius) / 6378.1 // radius in radians (earth radius in km)
-              ]
-            }
+        location: {
+          $geoWithin: {
+            $centerSphere: [
+              [parseFloat(lng), parseFloat(lat)],
+              parseFloat(radius) / 6378.1 // radius in radians (earth radius in km)
+            ]
           }
         }
+      }
       : {};
-      console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>geoFilter", geoFilter)
     if (req.user) {
-      data = await userModel.getHomeScreenProducts(req.user._id, { city, state, geoFilter  });
+      data = await userModel.getHomeScreenProducts(req.user._id, { city, state, geoFilter });
     }
     else {
       data = await userModel.getHomeScreenProductsGuestMode();
@@ -1287,7 +1286,7 @@ export const getHomeScreenProducts = async (req, res, next) => {
 
 export const getHomeScreenSearchedProducts = async (req, res, next) => {
   try {
-    const { name, category, subCategory, page , city, state, lat, lng, radius} = req.query;
+    const { name, category, subCategory, page, city, state, lat, lng, radius } = req.query;
     let data;
     if (req.user) {
       data = await userModel.getHomeScreenSearchedProducts(req.user._id, name, category, subCategory, page, city, state, lat, lng, radius);

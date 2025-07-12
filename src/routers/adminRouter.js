@@ -90,7 +90,13 @@ router.get(
   adminValidation.getPendingReviewServices,
   adminController.getPendingReviewServices,
 );
-
+router.post(
+  '/manual-moderate-services',
+  validateJWTAndValidateUser,
+  validateUserVerified,
+  validateUserAdmin,
+  adminController.moderateServices,
+);
 router.get(
   '/deactivated-products',
   validateJWTAndValidateUser,
