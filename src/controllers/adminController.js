@@ -114,11 +114,12 @@ export const getDeletedAccounts = async (req, res, next) => {
 };
 
 export const getProducts = async (req, res, next) => {
+  console.log("getProduts", req.query);
   try {
     const { name, category, subCategory, page } = req.query;
     const limit = 100;
     const skip = (page - 1) * limit;
-    let query = { status: 'active', adminStatus: 'active' };
+    let query = { status: 'active', adminStatus: 'active', moderationStatus: 'approved' };
     if (name) {
       const nameRegex = new RegExp(name.trim().split('').join('.*'), 'i');
       query = { ...query, name: { $regex: nameRegex } };
@@ -282,8 +283,10 @@ export const moderateServices = async (req, res, next) => {
 };
 
 export const getPendingReviewServices = async (req, res, next) => {
+
+  console.log("sfsfsdfsfsfdsds", req.query);
   try {
-    const {name, page } = req.query;
+    const { name, page } = req.query;
     const limit = 50;
     const skip = (page - 1) * limit;
     let query = { status: 'active', adminStatus: 'active', moderationStatus: 'pending_review' };
@@ -317,12 +320,12 @@ export const getPendingReviewServices = async (req, res, next) => {
         $limit: limit
       }
     ]);
-    
-    const total = await serviceModel.countDocuments({ 
+
+    const total = await serviceModel.countDocuments({
       moderationStatus: 'pending_review',
       status: { $ne: 'deleted' }
     });
-    
+
     res.status(200).json({
       success: true,
       message: 'Pending review services retrieved successfully.',
@@ -1213,7 +1216,7 @@ export const userSubscriptionsInMonth = async (req, res, next) => {
 
 const getInfluencerSettings = async (req, res) => {
   try {
-   
+
     let settings = await InfluencerSettings.findOne().select('influencerStatus createdAt');
 
     if (!settings) {
@@ -1227,7 +1230,7 @@ const getInfluencerSettings = async (req, res) => {
     });
   } catch (err) {
     console.log("Error fetching influencer settings:", err.message);
-    
+
     res.status(500).json({
       success: false,
       message: 'Failed to fetch influencer settings.',
@@ -1238,7 +1241,7 @@ const getInfluencerSettings = async (req, res) => {
 
 const getInfluencerRateSettings = async (req, res) => {
   try {
-   
+
     let settings = await InfluencerRateSettings.findOne().select('rateStatus createdAt');
 
     if (!settings) {
@@ -1252,7 +1255,7 @@ const getInfluencerRateSettings = async (req, res) => {
     });
   } catch (err) {
     console.log("Error fetching rate settings:", err.message);
-    
+
     res.status(500).json({
       success: false,
       message: 'Failed to fetch influencer settings.',
@@ -1266,7 +1269,7 @@ const updateInfluencerRateSettings = async (req, res) => {
     const { error, value } = updateInfluencerRateSettingsSchema.validate(req.body);
 
     if (error) {
-      return res.status(400).json({success: false,  message: error.details[0].message });
+      return res.status(400).json({ success: false, message: error.details[0].message });
     }
 
     let settings = await InfluencerRateSettings.findOne();
@@ -1285,7 +1288,7 @@ const updateInfluencerRateSettings = async (req, res) => {
     });
   } catch (err) {
     console.error('Error updating Rate settings:', err);
-    return res.status(500).json({success: false, message: 'Internal server error' });
+    return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
 
@@ -1294,7 +1297,7 @@ const updateInfluencerSettings = async (req, res) => {
     const { error, value } = updateInfluencerSettingsSchema.validate(req.body);
 
     if (error) {
-      return res.status(400).json({success: false,  message: error.details[0].message });
+      return res.status(400).json({ success: false, message: error.details[0].message });
     }
 
     let settings = await InfluencerSettings.findOne();
@@ -1321,48 +1324,48 @@ const updateInfluencerSettings = async (req, res) => {
     });
   } catch (err) {
     console.error('Error updating influencer settings:', err);
-    return res.status(500).json({success: false, message: 'Internal server error' });
+    return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
 
 const getAllInfluencers = async (req, res) => {
   try {
-  const {
-  name,
-  email,
-  emailVerified,
-  startDate,
-  endDate,
-  referrals, // 'asc' | 'desc'
-  commission, // 'asc' | 'desc'
-  totalEarning // 'asc' | 'desc'
-} = req.query;
+    const {
+      name,
+      email,
+      emailVerified,
+      startDate,
+      endDate,
+      referrals, // 'asc' | 'desc'
+      commission, // 'asc' | 'desc'
+      totalEarning // 'asc' | 'desc'
+    } = req.query;
 
-let filter = {
-  role: 'influencer'
-};
+    let filter = {
+      role: 'influencer'
+    };
 
-// Name (case-insensitive partial match)
-if (name) {
-  filter.name = { $regex: name, $options: 'i' };
-}
+    // Name (case-insensitive partial match)
+    if (name) {
+      filter.name = { $regex: name, $options: 'i' };
+    }
 
-// Email (case-insensitive partial match)
-if (email) {
-  filter['email.value'] = { $regex: email, $options: 'i' };
-}
+    // Email (case-insensitive partial match)
+    if (email) {
+      filter['email.value'] = { $regex: email, $options: 'i' };
+    }
 
-// Email verified
-if (emailVerified !== undefined) {
-  filter['email.verified'] = emailVerified === 'true';
-}
+    // Email verified
+    if (emailVerified !== undefined) {
+      filter['email.verified'] = emailVerified === 'true';
+    }
 
-// Date filter (createdAt range)
-if (startDate || endDate) {
-  filter.createdAt = {};
-  if (startDate) filter.createdAt.$gte = new Date(startDate);
-  if (endDate) filter.createdAt.$lte = new Date(endDate);
-}
+    // Date filter (createdAt range)
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate);
+      if (endDate) filter.createdAt.$lte = new Date(endDate);
+    }
 
 
     const influencers = await userModel.find(filter).select('-password');
@@ -1430,8 +1433,8 @@ if (startDate || endDate) {
       influencerData.sort((a, b) => (b.influencerRate || 0) - (a.influencerRate || 0));
     }
 
-      if (totalEarning === 'asc') {
-    influencerData.sort((a, b) => a.totalEarning - b.totalEarning);
+    if (totalEarning === 'asc') {
+      influencerData.sort((a, b) => a.totalEarning - b.totalEarning);
     } else if (totalEarning === 'desc') {
       influencerData.sort((a, b) => b.totalEarning - a.totalEarning);
     }
@@ -1560,7 +1563,7 @@ const toggleReferralStatus = async (req, res) => {
 
     const { influencer, isActive } = value;
 
-     const referral = await influencerReferralModel.findOne({ influencer: influencer });
+    const referral = await influencerReferralModel.findOne({ influencer: influencer });
     if (!referral) {
       return res.status(400).json({ success: false, message: 'Referral not found.' });
     }
@@ -1607,7 +1610,7 @@ const updateInfluencerRate = async (req, res) => {
     });
   } catch (err) {
     console.error('Error updating influencer rate:', err);
-    return res.status(500).json({success: false, message: 'Internal server error.' });
+    return res.status(500).json({ success: false, message: 'Internal server error.' });
   }
 };
 

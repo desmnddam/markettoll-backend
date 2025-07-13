@@ -323,6 +323,7 @@ productSchema.statics.getHomeScreenProducts = async function (userId, userAddres
     country: userAddress.country,
     status: 'active',
     adminStatus: 'active',
+    moderationStatus: 'approved'
   };
 
   // Optional filters
@@ -422,6 +423,7 @@ productSchema.statics.getHomeScreenProductsGuestMode = async function () {
       $match: {
         status: 'active',
         adminStatus: 'active',
+        moderationStatus: 'approved'
       },
     },
     {
@@ -494,7 +496,7 @@ productSchema.statics.getHomeScreenSearchedProducts = async function (userId, us
   const skip = (page - 1) * limit;
   const nameRegex = new RegExp(name.trim().split('').join('.*'), 'i');
 
-  let query = { seller: { $ne: userId }, country: userAddress.country, /* state: userAddress.state, city: userAddress.city, */ status: 'active', adminStatus: 'active' };
+  let query = { seller: { $ne: userId }, country: userAddress.country, /* state: userAddress.state, city: userAddress.city, */ status: 'active', adminStatus: 'active', moderationStatus: 'approved' };
 
   if (name) {
     await homeScreenSearchProductHistoryModel.addKeywordToUserHistory(userId, name);

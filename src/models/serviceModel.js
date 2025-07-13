@@ -275,10 +275,11 @@ serviceSchema.statics.getUserSearchedServicesBoosted = async function (userId, n
 };
 
 serviceSchema.statics.getHomeScreenServices = async function (userId, userAddress, page) {
+  console.log("userId, userAddress", userId, userAddress);
   const limit = 20;
   const skip = (page - 1) * limit;
-  let query = { seller: { $ne: userId }, country: userAddress.country, state: userAddress.state, city: userAddress.city, status: 'active' };
-
+  // let query = { seller: { $ne: userId }, country: userAddress.country, status: 'active', moderationStatus: 'approved' };
+  let query = { seller: userId, country: userAddress.country, status: 'active', moderationStatus: 'approved' };
   const services = await this.aggregate([
     {
       $match: query,
@@ -313,7 +314,7 @@ serviceSchema.statics.getHomeScreenServices = async function (userId, userAddres
       $limit: limit,
     },
   ]);
-
+  console.log("services", services);
   const wishlist = await wishlistServiceModel.getUserWishlistServicesAll(userId);
   const wishlistServiceIds = wishlist.map(it => it.service.toString());
 
@@ -324,7 +325,7 @@ serviceSchema.statics.getHomeScreenServices = async function (userId, userAddres
 serviceSchema.statics.getHomeScreenServicesGuestMode = async function (page) {
   const limit = 20;
   const skip = (page - 1) * limit;
-  let query = { status: 'active' };
+  let query = { status: 'active', moderationStatus: 'approved' };
 
   const services = await this.aggregate([
     {
