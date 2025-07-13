@@ -58,5 +58,3 @@ yarn.lock
 .DS_Store
 Thumbs.db
 
-# Firebase/Google service account keys
-src/files/*.json
